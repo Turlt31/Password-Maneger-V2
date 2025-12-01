@@ -1,0 +1,887 @@
+from tkinter import *
+
+from PIL import Image, ImageTk
+import urllib.request
+from io import BytesIO
+
+import theme
+import pyotp
+import time
+import os
+
+import webbrowser
+import pyperclip
+
+BG_PANEL = theme.BG_PANEL
+BG_LIST = theme.BG_LIST
+BG_BUTTON = theme.BG_BUTTON
+FG_COLOR_P = theme.FG_PRIMARY
+FG_COLOR_S = theme.FG_SECONDARY
+FG_HIGHLIGHT = theme.FG_MUTED
+
+def get_favicon(url):
+    cache_dir = f"icon/favicons"
+    os.makedirs(cache_dir, exist_ok=True)
+    
+    clean_url = url.replace("www.", "").replace("http://", "").replace("https://", "").replace("/", "_").split("?")[0]
+    if clean_url.endswith("_"): clean_url = clean_url[:-1]
+    cache_path = f"{cache_dir}/{clean_url}.png"
+    
+    if os.path.exists(cache_path): return cache_path
+    
+    try:
+        if not url.startswith("http"): url = "https://" + url
+        
+        favicon_url = f"https://www.google.com/s2/favicons?domain={url}&sz=128"     
+        with urllib.request.urlopen(favicon_url, timeout=5) as response: image_data = response.read()
+            
+        image = Image.open(BytesIO(image_data))
+        if image.size[0] < 128 or image.size[1] < 128:
+            image = image.resize((128, 128), Image.Resampling.LANCZOS)
+        image.save(cache_path, "PNG", quality=95, optimize=True)
+        
+        return cache_path
+    
+    except Exception as e:
+        print(f"Failed to fetch favicon for {url}: {e}")
+        return None
+def _clear_content(inner_frame: Frame, contFrame: Frame, dataFrame: Frame) -> None:
+    for widget in inner_frame.winfo_children():
+        if widget is not contFrame:
+            widget.destroy()
+    for widget in dataFrame.winfo_children():
+        widget.destroy()
+
+def passwords(passwordList, inner_frame, contFrame, canvas, dataFrame, root, user, searchParam):
+    _clear_content(inner_frame, contFrame, dataFrame)
+    if searchParam == "Search...": searchParam = ""      
+
+    showIconP = Image.open("icon/buttonImg/eyeP.png").resize((30, 30), Image.Resampling.LANCZOS)
+    showIconPTK = ImageTk.PhotoImage(showIconP)
+    showIconS = Image.open("icon/buttonImg/eyeS.png").resize((30, 30), Image.Resampling.LANCZOS)
+    showIconSTK = ImageTk.PhotoImage(showIconS)
+
+    hideIconP = Image.open("icon/buttonImg/hiddenP.png").resize((30, 30), Image.Resampling.LANCZOS)
+    hideIconPTK = ImageTk.PhotoImage(hideIconP)
+    hideIconS = Image.open("icon/buttonImg/hiddenS.png").resize((30, 30), Image.Resampling.LANCZOS)
+    hideIconSTK = ImageTk.PhotoImage(hideIconS)
+
+    editIconP = Image.open("icon/buttonImg/editP.png").resize((58, 58), Image.Resampling.LANCZOS)
+    editIconPTK = ImageTk.PhotoImage(editIconP)
+    editIconS = Image.open("icon/buttonImg/editS.png").resize((58, 58), Image.Resampling.LANCZOS)
+    editIconSTK = ImageTk.PhotoImage(editIconS)
+
+    deleteIconP = Image.open("icon/buttonImg/binP.png").resize((58, 58), Image.Resampling.LANCZOS)
+    deleteIconPTK = ImageTk.PhotoImage(deleteIconP)
+    deleteIconS = Image.open("icon/buttonImg/binS.png").resize((58, 58), Image.Resampling.LANCZOS)
+    deleteIconSTK = ImageTk.PhotoImage(deleteIconS)
+
+    def displayPassword(parts, lineStr, event):
+        for widget in dataFrame.winfo_children():
+            widget.destroy()
+        favicon_path = get_favicon(parts[1])
+        showVar = [False]
+
+        def showPassword():
+            showVar[0] = not showVar[0]
+            if showVar[0]:
+                showB.config(image=hideIconPTK)
+                passL.config(text=parts[3].strip('\n'))
+            else:
+                showB.config(image=showIconPTK)
+                passL.config(text="●"*len(parts[3].strip('\n')))
+        def editPassword():
+            def centerWindow(root, win, w, h):
+                root.update_idletasks()
+                win.update_idletasks()
+                root_x = root.winfo_x()
+                root_y = root.winfo_y()
+                root_w = root.winfo_width()
+                root_h = root.winfo_height()
+
+                x = root_x + (root_w // 2) - (w // 2)
+                y = root_y + (root_h // 2) - (h // 2)
+
+                win.geometry(f"{w}x{h}+{x-140}+{y+60}")
+            editScreen = Toplevel(dataFrame)
+            editScreen.resizable(False, False)
+            editScreen.geometry("400x570")
+            editScreen.title("Edit Password")
+            editScreen.iconbitmap('icon/pwm.ico')
+            editScreen.configure(bg=BG_PANEL)
+            centerWindow(root, editScreen, 400, 570)
+
+            phN = "Website"
+            phU = "Username"
+            phP = "Password"
+            phAuth = "Authentication Code"
+
+            tld = [".com", ".net", ".lt", ".org", ".gov"]
+            selected = StringVar(value=tld[0])
+
+            def on_focus_in(event):
+                widget = event.widget
+
+                if widget == wnE:
+                    if widget.get() == phN:
+                        widget.delete(0, END)
+                        widget.config(fg=FG_COLOR_P, justify="left")
+                elif widget == uE:
+                    if widget.get() == phU:
+                        widget.delete(0, END)
+                        widget.config(fg=FG_COLOR_P, justify="left")
+                elif widget == pE:
+                    if widget.get() == phP:
+                        widget.delete(0, END)
+                        widget.config(fg=FG_COLOR_P, justify="left")
+                elif widget == authE:
+                    if widget.get() == phAuth:
+                        widget.delete(0, END)
+                        widget.config(fg=FG_COLOR_P, justify="left", font=('arial', 20))        
+            def on_focus_out(event):
+                widget = event.widget
+
+                if widget == wnE:
+                    if widget.get() == "":
+                        widget.insert(0, phN)
+                        widget.config(fg=FG_COLOR_S, justify="center")
+                elif widget == uE:
+                    if widget.get() == "":
+                        widget.insert(0, phU)
+                        widget.config(fg=FG_COLOR_S, justify="center")
+                elif widget == pE:
+                    if widget.get() == "":
+                        widget.insert(0, phP)
+                        widget.config(fg=FG_COLOR_S, justify="center")
+                elif widget == authE:
+                    if widget.get() == "":
+                        widget.insert(0, phAuth)
+                        widget.config(fg=FG_COLOR_S, justify="center", font=('arial', 25))
+        
+            def saveUpdates():
+                site = wnE.get() if not getattr(wnE, "_is_placeholder", False) else ""
+                username = uE.get() if not getattr(uE, "_is_placeholder", False) else ""
+                password = pE.get() if not getattr(pE, "_is_placeholder", False) else ""
+                auth = authE.get() if not getattr(authE, "_is_placeholder", False) else ""
+
+                url = f"www.{site.lower()}{selected.get()}" if site else parts[1]
+
+                if auth != "Authentication Code":
+                    updatedLine = f"{site},{url},{username},{password},{auth}\n"
+                else:
+                    updatedLine = f"{site},{url},{username},{password}\n"
+
+                newPasswordList = []
+                with open(f"files/{user}/passwords.txt", 'r') as f: fullAccountList = f.readlines()
+                with open(f"files/{user}/passwords.txt", 'w') as f:
+                    for account in fullAccountList:
+                        if account == lineStr: f.write(updatedLine)
+                        else: f.write(account)
+
+                for account in passwordList:
+                    if account == lineStr: newPasswordList.append(updatedLine)
+                    else: newPasswordList.append(account)
+
+                editScreen.destroy()
+                passwords(newPasswordList, inner_frame, contFrame, canvas, dataFrame, root, user, searchParam)
+
+            Label(editScreen, text="Edit Password", font=('arial', 32), bg=BG_PANEL, fg=FG_COLOR_P).place(x=60, y=5)
+
+            wnE = Entry(editScreen, font=('arial', 28), fg=FG_COLOR_P, bg=theme.BG_INPUT, relief="flat", borderwidth=0, justify="left")
+            wnE.place(x=10, y=70, height=50, width=260)
+            wnE.insert(0, parts[0])
+            wnE.bind("<FocusIn>", on_focus_in)
+            wnE.bind("<FocusOut>", on_focus_out)
+
+            tldB =  OptionMenu(editScreen, selected, *tld)
+            tldB.config(font=('arial', 26), fg=FG_COLOR_P, bg=theme.BG_INPUT, relief="flat", borderwidth=0)
+            tldB["menu"].config(font=('arial', 18))
+            tldB.place(x=280, y=70, height=50, width=110)
+
+            uE = Entry(editScreen, font=('arial', 28), fg=FG_COLOR_P, bg=theme.BG_INPUT, relief="flat", borderwidth=0, justify="left")
+            uE.place(x=10, y=135, height=50, width=380)
+            uE.insert(0, parts[2])
+            uE.bind("<FocusIn>", on_focus_in)
+            uE.bind("<FocusOut>", on_focus_out)
+
+            pE = Entry(editScreen, font=('arial', 28), fg=FG_COLOR_P, bg=theme.BG_INPUT, relief="flat", borderwidth=0, justify="left")
+            pE.place(x=10, y=200, height=50, width=380)
+            pE.insert(0, parts[3].strip('\n'))
+            pE.bind("<FocusIn>", on_focus_in)
+            pE.bind("<FocusOut>", on_focus_out)
+
+            Label(editScreen, text="Optional", font=('arial', 30), bg=BG_PANEL, fg=FG_COLOR_P).place(x=125, y=280)
+
+            authE = Entry(editScreen, font=('arial', 20), fg=FG_COLOR_P, bg=theme.BG_INPUT, relief="flat", borderwidth=0, justify="center")
+            authE.place(x=10, y=340, height=50, width=380)
+            if len(parts) == 5: authE.insert(0, parts[4].strip('\n')); authE.config(fg=FG_COLOR_P)
+            else :authE.insert(0, phAuth)
+            authE.bind("<FocusIn>", on_focus_in)
+            authE.bind("<FocusOut>", on_focus_out)
+
+            saveB = Button(editScreen, text="Save Account", font=('arial', 30), command=saveUpdates, bg=theme.BG_BUTTON, fg=FG_COLOR_P, relief="flat", borderwidth=1)
+            saveB.place(x=10, y=510, height=50, width=380)
+        def deletePassword():
+            newPasswordList = []
+            with open(f"files/{user}/passwords.txt", "r") as f:
+                fullAccountList = f.readlines()
+            with open(f"files/{user}/passwords.txt", "w") as f:
+                for account in fullAccountList:
+                    if account == lineStr:
+                        continue
+                    f.write(account)
+
+            for account in passwordList:
+                if account == lineStr:
+                    continue
+                newPasswordList.append(account)
+
+            passwords(newPasswordList, inner_frame, contFrame, canvas, dataFrame, root, user, searchParam)
+
+        def onClick(event):
+            widget = event.widget
+            if len(parts) == 5:
+                totp = pyotp.TOTP(parts[4].strip('\n'), interval=30)
+                if widget == authL: pyperclip.copy(totp.now())
+
+            if widget == linkL: webbrowser.open(parts[1])
+            if widget == userL: pyperclip.copy(parts[2])
+            if widget == passL: pyperclip.copy(parts[3].strip('\n'))
+            
+        def onHoverEnter(event):
+            widget = event.widget
+
+            if widget == linkL: linkL.configure(fg=theme.ACCENT_BLUE_GLOW)
+            if widget == userL: userL.configure(fg=FG_HIGHLIGHT)
+            if widget == passL: passL.configure(fg=FG_HIGHLIGHT)
+            if widget == editB: editB.configure(image=editIconSTK)
+            if widget == deleteB: deleteB.configure(image=deleteIconSTK)
+            if widget == showB:
+                if showVar[0]:showB.configure(image=hideIconSTK)
+                else: showB.configure(image=showIconSTK)
+        def onHoverLeave(event):
+            widget = event.widget
+
+            if widget == linkL: linkL.configure(fg=theme.ACCENT_BLUE)
+            if widget == userL: userL.configure(fg=FG_COLOR_S)
+            if widget == passL: passL.configure(fg=FG_COLOR_S)
+            if widget == editB: editB.configure(image=editIconPTK)
+            if widget == deleteB: deleteB.configure(image=deleteIconPTK)
+            if widget == showB:
+                if showVar[0]: showB.configure(image=hideIconPTK)
+                else: showB.configure(image=showIconPTK)
+
+        try:
+            favicon_image = Image.open(favicon_path)
+            favicon_image = favicon_image.resize((96, 96), Image.Resampling.LANCZOS)
+            favicon_photo = ImageTk.PhotoImage(favicon_image)
+
+            icon_label = Label(dataFrame, image=favicon_photo, bg=BG_PANEL)
+            icon_label.image = favicon_photo
+            icon_label.place(relx=0.02, rely=0.02, width=100, height=100)
+        except: print("no")
+
+        dataFrame.configure(bg=BG_PANEL)
+
+        Label(dataFrame, text=parts[0], font=('arial', 32, 'bold'), bg=BG_PANEL, fg=FG_COLOR_P).place(relx=0.25, rely=0.03)
+        linkL = Label(dataFrame, text=parts[1], font=('arial', 24, 'underline'), bg=BG_PANEL, fg=theme.ACCENT_BLUE)
+        linkL.place(relx=0.25, rely=0.11)
+        linkL.bind("<Button-1>", onClick)
+        linkL.bind("<Enter>", onHoverEnter)
+        linkL.bind("<Leave>", onHoverLeave)
+
+        Label(dataFrame, text="Username", font=('arial',35, 'bold'), bg=BG_PANEL, fg=FG_COLOR_P).place(relx=0.02, rely=0.2)
+        userL = Label(dataFrame, text=parts[2], font=('arial', 22), bg=BG_PANEL, fg=FG_COLOR_S)
+        userL.place(relx=0.02, rely=0.29)
+        userL.bind("<Button-1>", onClick)
+        userL.bind("<Enter>", onHoverEnter)
+        userL.bind("<Leave>", onHoverLeave)
+
+        Label(dataFrame, text="Password", font=('arial',35, 'bold'), bg=BG_PANEL, fg=FG_COLOR_P).place(relx=0.02, rely=0.37)
+        passL = Label(dataFrame, text="●"*len(parts[3].strip('\n')), font=('arial', 22), bg=BG_PANEL, fg=FG_COLOR_S)
+        passL.place(relx=0.02, rely=0.45)
+        passL.bind("<Button-1>", onClick)
+        passL.bind("<Enter>", onHoverEnter)
+        passL.bind("<Leave>", onHoverLeave)
+
+        if len(parts) == 5:
+            def start_totp_label(label):
+                totp = pyotp.TOTP(parts[4].strip('\n'), interval=30)
+
+                def update_code():
+                    nonlocal current_code, cycle_start
+
+                    current_code = totp.now()
+                    cycle_start = time.time()
+                    label.config(text=current_code)
+                    update_color()
+
+                def update_color():
+                    elapsed = time.time() - cycle_start
+                    remaining = 30 - elapsed
+
+                    if remaining <= 0:
+                        update_code()
+                        return
+                    ratio = remaining / 30
+
+                    r = int((1 - ratio) * 255)
+                    g = int(ratio * 255)
+                    color = f"#{r:02x}{g:02x}00"
+
+                    label.config(fg=color)
+                    label.after(100, update_color)
+
+                current_code = None
+                cycle_start = None
+                update_code()
+
+            Label(dataFrame, text="Auth Code", font=('arial',35, 'bold'), bg=BG_PANEL, fg=FG_COLOR_P).place(relx=0.02, rely=0.55)
+            authL = Label(dataFrame, font=('arial', 22), bg=BG_PANEL)
+            authL.place(relx=0.02, rely=0.64)
+            authL.bind("<Button-1>", onClick)
+
+            start_totp_label(authL)
+
+        showB = Button(dataFrame, image=showIconPTK, command=showPassword, relief="flat", bd=0, bg=BG_PANEL, activebackground=BG_PANEL)
+        showB.place(relx=0.9, rely=0.46, width=32, height=32)
+        showB.bind("<Enter>", onHoverEnter)
+        showB.bind("<Leave>", onHoverLeave)
+
+        editB = Button(dataFrame, image=editIconPTK, command=editPassword, relief="flat", bd=0, bg=BG_PANEL, activebackground=BG_PANEL)
+        editB.place(relx=0.85, rely=0.02, height=64, width=64)
+        editB.bind("<Enter>", onHoverEnter)
+        editB.bind("<Leave>", onHoverLeave)
+
+        deleteB = Button(dataFrame, image=deleteIconPTK, command=deletePassword, relief="flat", bd=0, bg=BG_PANEL, activebackground=BG_PANEL)
+        deleteB.place(relx=0.85, rely=0.9, height=64, width=64)
+        deleteB.bind("<Enter>", onHoverEnter)
+        deleteB.bind("<Leave>", onHoverLeave)
+
+        Label(dataFrame, text="Hint: Click to Copy", font=('arial', 15), bg=BG_PANEL, fg="#424242").place(relx=0.35, rely=0.95)
+    
+    yPos = 10
+
+    def move_password(lineStr, direction):
+        with open(f"files/{user}/passwords.txt", "r") as f:
+            full_list = f.readlines()
+
+        try: idx = full_list.index(lineStr)
+        except ValueError: return
+
+        target_idx = idx - 1 if direction == "up" else idx + 1
+        if target_idx < 0 or target_idx >= len(full_list): return
+
+        full_list[idx], full_list[target_idx] = full_list[target_idx], full_list[idx]
+        with open(f"files/{user}/passwords.txt", "w") as f: f.writelines(full_list)
+
+        passwords(full_list, inner_frame, contFrame, canvas, dataFrame, user, searchParam)
+
+    filtered_passwords = []
+    if searchParam == "":
+        filtered_passwords = list(enumerate(passwordList))
+    else:
+        search_lower = searchParam.lower()
+        for idx, password in enumerate(passwordList):
+            password_parts = password.split(',')
+            if search_lower in password_parts[0].lower(): filtered_passwords.append((idx, password))
+
+    for idx, line in filtered_passwords:
+        parts = line.strip("\n").split(",")
+        if len(parts) < 4:
+            continue
+
+        accFrame = Frame(inner_frame, bg=theme.BG_CARD, bd=0, highlightthickness=0)
+        accFrame.place(x=10, y=yPos, relwidth=0.95, height=80)
+        accFrame.bind("<Button-1>", lambda e, p=parts, ln=line: displayPassword(p, ln, e))
+        accFrame.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+
+        favicon_path = get_favicon(parts[1])
+        if favicon_path and os.path.exists(favicon_path):
+            try:
+                favicon_image = Image.open(favicon_path)
+                favicon_image = favicon_image.resize((64, 64), Image.Resampling.LANCZOS)
+                favicon_photo = ImageTk.PhotoImage(favicon_image)
+                icon_label = Label(accFrame, image=favicon_photo, bg=theme.BG_CARD, bd=0)
+                icon_label.image = favicon_photo
+                icon_label.place(x=8, y=8, width=64, height=64)
+                icon_label.bind("<Button-1>", lambda e, p=parts, ln=line: displayPassword(p, ln, e))
+                icon_label.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+            except Exception as e:
+                print(f"Failed to display favicon: {e}")
+
+        siteL = Label(accFrame, text=parts[0], font=('arial', 28), bg=theme.BG_CARD, fg=FG_COLOR_P)
+        siteL.place(x=80, y=2)
+        siteL.bind("<Button-1>", lambda e, p=parts, ln=line: displayPassword(p, ln, e))
+        siteL.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+        userL = Label(accFrame, text=parts[2], font=("arial", 14), bg=theme.BG_CARD, fg=FG_COLOR_S)
+        userL.place(x=80, y=46)
+        userL.bind("<Button-1>", lambda e, p=parts, ln=line: displayPassword(p, ln, e))
+        userL.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+
+        move_up_disabled = idx == 0
+        move_down_disabled = idx == len(passwordList) - 1
+
+        upB = Button(accFrame, text="↑", font=('arial', 16, 'bold'), command=lambda ln=line: move_password(ln, "up"), bg=theme.BG_BUTTON, fg=FG_COLOR_P, relief="flat", bd=0, state="disabled" if move_up_disabled else "normal", activebackground=theme.BG_BUTTON)
+        upB.place(relx=0.92, y=8, width=32, height=28)
+        upB.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+
+        downB = Button(accFrame, text="↓", font=('arial', 16, 'bold'), command=lambda ln=line: move_password(ln, "down"), bg=theme.BG_BUTTON, fg=FG_COLOR_P, relief="flat", bd=0, state="disabled" if move_down_disabled else "normal", activebackground=theme.BG_BUTTON)
+        downB.place(relx=0.92, y=44, width=32, height=28)
+        downB.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+
+        yPos += 100
+
+    inner_frame.update_idletasks()
+    total_height = yPos + 10
+    inner_frame.config(height=total_height, width=canvas.winfo_width())
+    canvas.update_idletasks()
+    canvas.config(scrollregion=(0, 0, canvas.winfo_width(), total_height))
+
+def cards(cardList, inner_frame, contFrame, canvas, dataFrame, root, user, searchParam):
+    _clear_content(inner_frame, contFrame, dataFrame)
+    if searchParam == "Search...": searchParam = ""      
+    yPos = 10
+
+    showIconP = Image.open("icon/buttonImg/eyeP.png").resize((30, 30), Image.Resampling.LANCZOS)
+    showIconPTK = ImageTk.PhotoImage(showIconP)
+    showIconS = Image.open("icon/buttonImg/eyeS.png").resize((30, 30), Image.Resampling.LANCZOS)
+    showIconSTK = ImageTk.PhotoImage(showIconS)
+
+    hideIconP = Image.open("icon/buttonImg/hiddenP.png").resize((30, 30), Image.Resampling.LANCZOS)
+    hideIconPTK = ImageTk.PhotoImage(hideIconP)
+    hideIconS = Image.open("icon/buttonImg/hiddenS.png").resize((30, 30), Image.Resampling.LANCZOS)
+    hideIconSTK = ImageTk.PhotoImage(hideIconS)
+
+    editIconP = Image.open("icon/buttonImg/editP.png").resize((58, 58), Image.Resampling.LANCZOS)
+    editIconPTK = ImageTk.PhotoImage(editIconP)
+    editIconS = Image.open("icon/buttonImg/editS.png").resize((58, 58), Image.Resampling.LANCZOS)
+    editIconSTK = ImageTk.PhotoImage(editIconS)
+
+    deleteIconP = Image.open("icon/buttonImg/binP.png").resize((58, 58), Image.Resampling.LANCZOS)
+    deleteIconPTK = ImageTk.PhotoImage(deleteIconP)
+    deleteIconS = Image.open("icon/buttonImg/binS.png").resize((58, 58), Image.Resampling.LANCZOS)
+    deleteIconSTK = ImageTk.PhotoImage(deleteIconS)
+
+    def displayCard(parts, lineStr, event=None):
+        for widget in dataFrame.winfo_children(): widget.destroy()
+        favicon_path = get_favicon(parts[1])
+        showVar = [True]
+
+        def showCard():
+            def formatCard(number, mode="n"):
+                digits = "".join(c for c in number if c.isdigit())
+
+                if mode == "m": 
+                    if len(digits) >= 8:
+                        masked_digits = digits[:-8] + "●" * 8
+                    else:
+                        masked_digits = "●" * len(digits)
+                    final = masked_digits
+                else: final = digits
+
+                spaced = " ".join(final[i:i+4] for i in range(0, len(final), 4))
+                return spaced
+            showVar[0] = not showVar[0]
+
+            if showVar[0]:
+                cardNumber = formatCard(parts[3])
+                showB.config(image=hideIconPTK)
+                cardNoL.config(text=cardNumber)
+                cvcL.config(text=parts[5])
+                pinL.config(text=parts[6])
+            else:
+                cardNumber = formatCard(parts[3], mode="m")
+                showB.config(image=showIconPTK)
+                cardNoL.config(text=cardNumber)
+                cvcL.config(text="●"*len(parts[5]))
+                pinL.config(text="●"*len(parts[6].strip('\n')))
+        def editCard():
+            def centerWindow(root, win, w, h):
+                root.update_idletasks()
+                win.update_idletasks()
+                root_x = root.winfo_x()
+                root_y = root.winfo_y()
+                root_w = root.winfo_width()
+                root_h = root.winfo_height()
+
+                x = root_x + (root_w // 2) - (w // 2)
+                y = root_y + (root_h // 2) - (h // 2)
+
+                win.geometry(f"{w}x{h}+{x-140}+{y+60}")
+            editScreen = Toplevel(dataFrame)
+            editScreen.resizable(False, False)
+            editScreen.geometry("400x570")
+            editScreen.title("Edit Card")
+            editScreen.iconbitmap('icon/pwm.ico')
+            editScreen.configure(bg=BG_PANEL)
+            centerWindow(root, editScreen, 400, 570)
+
+            phB = "Bank Name"
+            phN = "Name on Card"
+            phC = "Card Number"
+            phExpd = "MM/YY"
+            phCvc = "CVC Code"
+            phPin = "PIN Code"
+
+            tld = [".com", ".net", ".lt", ".org", ".gov"]
+            selected = StringVar(value=tld[0])
+            
+            def on_focus_in(event):
+                widget = event.widget
+
+                if widget == bE:
+                    if widget.get() == phB:
+                        widget.delete(0, END)
+                        widget.config(fg="black", justify="left")
+                elif widget == nE:
+                    if widget.get() == phN:
+                        widget.delete(0, END)
+                        widget.config(fg="black", justify="left")
+                elif widget == cE:
+                    if widget.get() == phC:
+                        widget.delete(0, END)
+                        widget.config(fg="black", justify="left")
+                elif widget == expdE:
+                    if widget.get() == phExpd:
+                        widget.delete(0, END)
+                        widget.config(fg="black", justify="center")
+                elif widget == cvcE:
+                    if widget.get() == phCvc:
+                        widget.delete(0, END)
+                        widget.config(fg="black", justify="center")
+                elif widget == pinE:
+                    if widget.get() == phPin:
+                        widget.delete(0, END)
+                        widget.config(fg="black", justify="center")        
+            def on_focus_out(event):
+                widget = event.widget
+
+                if widget == bE:
+                    if widget.get() == "":
+                        widget.insert(0, phB)
+                        widget.config(fg="grey", justify="center")
+                elif widget == nE:
+                    if widget.get() == "":
+                        widget.insert(0, phN)
+                        widget.config(fg="grey", justify="center")
+                elif widget == cE:
+                    if widget.get() == "":
+                        widget.insert(0, phC)
+                        widget.config(fg="grey", justify="center")
+                elif widget == expdE:
+                    if widget.get() == "":
+                        widget.insert(0, phExpd)
+                        widget.config(fg="grey", justify="center")
+                elif widget == cvcE:
+                    if widget.get() == "":
+                        widget.insert(0, phCvc)
+                        widget.config(fg="grey", justify="center")
+                elif widget == pinE:
+                    if widget.get() == "":
+                        widget.insert(0, phPin)
+                        widget.config(fg="grey", justify="center")
+            def format_expiry(event=None):
+                text = expdE.get()
+
+                digits = "".join([c for c in text if c.isdigit()])
+                digits = digits[:4]
+
+                formatted = ""
+                if len(digits) >= 2:
+                    formatted = digits[:2] + "/" + digits[2:]
+                else:
+                    formatted = digits
+
+                if expdE.get() != formatted:
+                    expdE.delete(0, END)
+                    expdE.insert(0, formatted)
+            def saveUpdates():
+                bank = bE.get() if not getattr(bE, "_is_placeholder", False) else ""
+                name = nE.get() if not getattr(nE, "_is_placeholder", False) else ""
+                card_no = cE.get() if not getattr(cE, "_is_placeholder", False) else ""
+                exp = expdE.get() if not getattr(expdE, "_is_placeholder", False) else ""
+                cvc = cvcE.get() if not getattr(cvcE, "_is_placeholder", False) else ""
+                pin = pinE.get() if not getattr(pinE, "_is_placeholder", False) else ""
+
+                url = f"www.{bank.lower()}{selected.get()}" if bank else parts[1]
+                updated_line = f"{bank},{url},{name},{card_no},{exp},{cvc},{pin}\n"
+
+                newCardList = []
+                with open(f"files/{user}/cards.txt", "r") as f:
+                    fullCardList = f.readlines()
+                with open(f"files/{user}/cards.txt", "w") as f:
+                    for account in fullCardList:
+                        if account == lineStr:
+                            f.write(updated_line)
+                        else:
+                            f.write(account)
+
+                for account in cardList:
+                    if account == lineStr: newCardList.append(updated_line)
+                    else: newCardList.append(account)
+
+                editScreen.destroy()
+                cards(newCardList, inner_frame, contFrame, canvas, dataFrame, root, user, searchParam)
+
+            Label(editScreen, text="Edit Card", font=('arial', 32), bg=BG_PANEL, fg=FG_COLOR_P).place(x=100, y=5)
+
+            bE = Entry(editScreen, font=('arial', 28), fg=FG_COLOR_P, bg=theme.BG_INPUT, relief="flat", borderwidth=0, justify="left")
+            bE.place(x=10, y=70, height=50, width=260)
+            bE.insert(0, parts[0])
+            bE.bind("<FocusIn>", on_focus_in)
+            bE.bind("<FocusOut>", on_focus_out)
+
+            tldB =  OptionMenu(editScreen, selected, *tld)
+            tldB.config(font=('arial', 26), fg=FG_COLOR_P, bg=theme.BG_INPUT, relief="flat", borderwidth=0)
+            tldB["menu"].config(font=('arial', 18))
+            tldB.place(x=280, y=70, height=50, width=110)
+
+            nE = Entry(editScreen, font=('arial', 28), fg=FG_COLOR_P, bg=theme.BG_INPUT, relief="flat", borderwidth=0, justify="left")
+            nE.place(x=10, y=135, height=50, width=380)
+            nE.insert(0, parts[2])
+            nE.bind("<FocusIn>", on_focus_in)
+            nE.bind("<FocusOut>", on_focus_out)
+
+            cE = Entry(editScreen, font=('arial', 28), fg=FG_COLOR_P, bg=theme.BG_INPUT, relief="flat", borderwidth=0, justify="left")
+            cE.place(x=10, y=220, height=50, width=380)
+            cE.insert(0, parts[3])
+            cE.bind("<FocusIn>", on_focus_in)
+            cE.bind("<FocusOut>", on_focus_out)
+
+            expdE = Entry(editScreen, font=('arial', 28), fg=FG_COLOR_P, bg=theme.BG_INPUT, relief="flat", borderwidth=0, justify="center")
+            expdE.place(x=10, y=285, height=50, width=380)
+            expdE.insert(0, parts[4])
+            expdE.bind("<FocusIn>", on_focus_in)
+            expdE.bind("<FocusOut>", on_focus_out)
+            expdE.bind("<KeyRelease>", format_expiry)
+
+            cvcE = Entry(editScreen, font=('arial', 28), fg=FG_COLOR_P, bg=theme.BG_INPUT, relief="flat", borderwidth=0, justify="center")
+            cvcE.place(x=10, y=365, height=50, width=380)
+            cvcE.insert(0, parts[5])
+            cvcE.bind("<FocusIn>", on_focus_in)
+            cvcE.bind("<FocusOut>", on_focus_out)
+
+            pinE = Entry(editScreen, font=('arial', 28), fg=FG_COLOR_P, bg=theme.BG_INPUT, relief="flat", borderwidth=0, justify="center")
+            pinE.place(x=10, y=430, height=50, width=380)
+            pinE.insert(0, parts[6].strip('\n'))
+            pinE.bind("<FocusIn>", on_focus_in)
+            pinE.bind("<FocusOut>", on_focus_out)
+
+            saveB = Button(editScreen, text="Save Card", font=('arial', 30), command=saveUpdates, bg=theme.BG_BUTTON, fg=FG_COLOR_P, relief="flat", borderwidth=1)
+            saveB.place(x=10, y=510, height=50, width=380)
+        def deleteCard():
+            newCardList = []
+            with open(f"files/{user}/cards.txt", "r") as f: fullCardList = f.readlines()
+            with open(f"files/{user}/cards.txt", "w") as f:
+                for card_line in fullCardList:
+                    if card_line == lineStr: continue
+                    f.write(card_line)
+
+            for card_line in cardList:
+                if card_line == lineStr: continue
+                newCardList.append(card_line)
+
+            cards(newCardList, inner_frame, contFrame, canvas, dataFrame, root, user, searchParam)
+
+        try:
+            favicon_image = Image.open(favicon_path)
+            favicon_image = favicon_image.resize((96, 96), Image.Resampling.LANCZOS)
+            favicon_photo = ImageTk.PhotoImage(favicon_image)
+
+            icon_label = Label(dataFrame, image=favicon_photo, bg=BG_PANEL)
+            icon_label.image = favicon_photo
+            icon_label.place(relx=0.02, rely=0.02, width=100, height=100)
+        except: print("no")
+
+        dataFrame.configure(bg=BG_PANEL)
+
+        def onClick(event):
+            widget = event.widget
+
+            if widget == linkL: webbrowser.open(parts[1])
+            if widget == nameOnCardL: pyperclip.copy(parts[2])
+            if widget == cardNoL: pyperclip.copy(parts[3])
+            if widget == expDateL: pyperclip.copy(parts[4])
+            if widget == cvcL: pyperclip.copy(parts[5])
+            if widget == pinL: pyperclip.copy(parts[6])
+        def onHoverEnter(event):
+            widget = event.widget
+
+            if widget == linkL: linkL.config(fg=theme.ACCENT_BLUE_GLOW)
+            if widget == nameOnCardL: nameOnCardL.config(fg=FG_HIGHLIGHT)
+            if widget == cardNoL: cardNoL.config(fg=FG_HIGHLIGHT)
+            if widget == expDateL: expDateL.config(fg=FG_HIGHLIGHT)
+            if widget == cvcL: cvcL.config(fg=FG_HIGHLIGHT)
+            if widget == pinL: pinL.config(fg=FG_HIGHLIGHT)
+            if widget == editB: editB.configure(image=editIconSTK)
+            if widget == deleteB: deleteB.configure(image=deleteIconSTK)
+            if widget == showB:
+                if showVar[0]:showB.configure(image=hideIconSTK)
+                else: showB.configure(image=showIconSTK)
+        def onHoverLeave(event):
+            widget = event.widget
+
+            if widget == linkL: linkL.config(fg=theme.ACCENT_BLUE)
+            if widget == nameOnCardL: nameOnCardL.config(fg=FG_COLOR_S)
+            if widget == cardNoL: cardNoL.config(fg=FG_COLOR_S)
+            if widget == expDateL: expDateL.config(fg=FG_COLOR_S)
+            if widget == cvcL: cvcL.config(fg=FG_COLOR_S)
+            if widget == pinL: pinL.config(fg=FG_COLOR_S)
+            if widget == editB: editB.configure(image=editIconPTK)
+            if widget == deleteB: deleteB.configure(image=deleteIconPTK)
+            if widget == showB:
+                if showVar[0]: showB.configure(image=hideIconPTK)
+                else: showB.configure(image=showIconPTK)
+
+        Label(dataFrame, text=parts[0], font=('arial', 32, 'bold'), bg=BG_PANEL, fg=FG_COLOR_P).place(relx=0.25, rely=0.03)
+        linkL = Label(dataFrame, text=parts[1], font=('arial', 24, 'underline'), bg=BG_PANEL, fg=theme.ACCENT_BLUE)
+        linkL.place(relx=0.25, rely=0.1)
+        linkL.bind("<Button-1>", onClick)
+        linkL.bind("<Enter>", onHoverEnter)
+        linkL.bind("<Leave>", onHoverLeave)
+
+        Label(dataFrame, text="Name on Card", font=('arial',35, 'bold'), bg=BG_PANEL, fg=FG_COLOR_P).place(relx=0.02, rely=0.2)
+        nameOnCardL = Label(dataFrame, text=parts[2], font=('arial', 22), bg=BG_PANEL, fg=FG_COLOR_S)
+        nameOnCardL.place(relx=0.02, rely=0.28)
+        nameOnCardL.bind("<Button-1>", onClick)
+        nameOnCardL.bind("<Enter>", onHoverEnter)
+        nameOnCardL.bind("<Leave>", onHoverLeave)
+
+        Label(dataFrame, text="Card Number", font=('arial',35, 'bold'), bg=BG_PANEL, fg=FG_COLOR_P).place(relx=0.02, rely=0.37)
+        cardNoL = Label(dataFrame, text=" ".join(parts[3][i:i+4] for i in range(0, len(parts[3]), 4)), font=('arial', 22), bg=BG_PANEL, fg=FG_COLOR_S)
+        cardNoL.place(relx=0.02, rely=0.45)
+        cardNoL.bind("<Button-1>", onClick)
+        cardNoL.bind("<Enter>", onHoverEnter)
+        cardNoL.bind("<Leave>", onHoverLeave)
+
+        Label(dataFrame, text="MM/YY", font=('arial',35, 'bold'), bg=BG_PANEL, fg=FG_COLOR_P).place(relx=0.02, rely=0.54)
+        expDateL = Label(dataFrame, text=parts[4], font=('arial', 22), bg=BG_PANEL, fg=FG_COLOR_S)
+        expDateL.place(relx=0.02, rely=0.62)
+        expDateL.bind("<Button-1>", onClick)
+        expDateL.bind("<Enter>", onHoverEnter)
+        expDateL.bind("<Leave>", onHoverLeave)
+
+        Label(dataFrame, text="CVC", font=('arial',35, 'bold'), bg=BG_PANEL, fg=FG_COLOR_P).place(relx=0.5, rely=0.54)
+        cvcL = Label(dataFrame, text=parts[5], font=('arial', 22), bg=BG_PANEL, fg=FG_COLOR_S)
+        cvcL.place(relx=0.52, rely=0.62)
+        cvcL.bind("<Button-1>", onClick)
+        cvcL.bind("<Enter>", onHoverEnter)
+        cvcL.bind("<Leave>", onHoverLeave)
+
+        Label(dataFrame, text="Pin Code", font=('arial',35, 'bold'), bg=BG_PANEL, fg=FG_COLOR_P).place(relx=0.02, rely=0.71)
+        pinL = Label(dataFrame, text=parts[6], font=('arial', 22), bg=BG_PANEL, fg=FG_COLOR_S)
+        pinL.place(relx=0.02, rely=0.79)
+        pinL.bind("<Button-1>", onClick)
+        pinL.bind("<Enter>", onHoverEnter)
+        pinL.bind("<Leave>", onHoverLeave)
+
+        showB = Button(dataFrame, image=showIconPTK, command=showCard, relief="flat", bd=0, bg=BG_PANEL, activebackground=BG_PANEL)
+        showB.place(relx=0.9, rely=0.46, width=32, height=32)
+        showB.bind("<Enter>", onHoverEnter)
+        showB.bind("<Leave>", onHoverLeave)
+
+        editB = Button(dataFrame, image=editIconPTK, command=editCard, relief="flat", bd=0, bg=BG_PANEL, activebackground=BG_PANEL)
+        editB.place(relx=0.85, rely=0.02, height=64, width=64)
+        editB.bind("<Enter>", onHoverEnter)
+        editB.bind("<Leave>", onHoverLeave)
+
+        deleteB = Button(dataFrame, image=deleteIconPTK, command=deleteCard, relief="flat", bd=0, bg=BG_PANEL, activebackground=BG_PANEL)
+        deleteB.place(relx=0.85, rely=0.9, height=64, width=64)
+        deleteB.bind("<Enter>", onHoverEnter)
+        deleteB.bind("<Leave>", onHoverLeave)
+
+        Label(dataFrame, text="Hint: Click to Copy", font=('arial', 15), bg=BG_PANEL, fg=FG_HIGHLIGHT).place(relx=0.35, rely=0.95)
+        showCard()
+
+    def move_card(lineStr, direction):
+        with open(f"files/{user}/cards.txt", "r") as f: full_list = f.readlines()
+
+        try: idx = full_list.index(lineStr)
+        except ValueError: return
+
+        target_idx = idx - 1 if direction == "up" else idx + 1
+        if target_idx < 0 or target_idx >= len(full_list): return
+
+        full_list[idx], full_list[target_idx] = full_list[target_idx], full_list[idx]
+        with open(f"files/{user}/cards.txt", "w") as f: f.writelines(full_list)
+
+        cards(full_list, inner_frame, contFrame, canvas, dataFrame, user, searchParam)
+
+    filteredCards = []
+    if not searchParam:
+        filteredCards = list(enumerate(cardList))
+    else:
+        search_lower = searchParam.lower()
+        for idx, line in enumerate(cardList):
+            parts = line.split(',')
+            if parts and search_lower in parts[0].lower(): filteredCards.append((idx, line))
+
+    for idx, line in filteredCards:
+        parts = line.strip("\n").split(",")
+        if len(parts) < 7: continue
+
+        accFrame = Frame(inner_frame, bg=theme.BG_CARD, bd=0, highlightthickness=0)
+        accFrame.place(x=10, y=yPos, relwidth=0.95, height=80)
+        accFrame.bind("<Button-1>", lambda e, p=parts, ln=line: displayCard(p, ln, e))
+        accFrame.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+
+        favicon_path = get_favicon(parts[1])
+        if favicon_path and os.path.exists(favicon_path):
+            try:
+                favicon_image = Image.open(favicon_path)
+                favicon_image = favicon_image.resize((64, 64), Image.Resampling.LANCZOS)
+                favicon_photo = ImageTk.PhotoImage(favicon_image)
+                icon_label = Label(accFrame, image=favicon_photo, bg=theme.BG_CARD, bd=0)
+                icon_label.image = favicon_photo
+                icon_label.place(x=8, y=8, width=64, height=64)
+                icon_label.bind("<Button-1>", lambda e, p=parts, ln=line: displayCard(p, ln, e))
+                icon_label.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+            except Exception as e:
+                print(f"Failed to display favicon: {e}")
+                pass
+
+        bankNameL = Label(accFrame, text=parts[0], font=('arial', 28), bg=theme.BG_CARD, fg=FG_COLOR_P)
+        bankNameL.place(x=80, y=2)
+        bankNameL.bind("<Button-1>", lambda e, p=parts, ln=line: displayCard(p, ln, e))
+        bankNameL.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+        cardNameL = Label(accFrame, text=parts[2], font=('arial', 15), bg=theme.BG_CARD, fg=FG_COLOR_S)
+        cardNameL.place(x=80, y=47)
+        cardNameL.bind("<Button-1>", lambda e, p=parts, ln=line: displayCard(p, ln, e))
+        cardNameL.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+
+        move_up_disabled = idx == 0
+        move_down_disabled = idx == len(cardList) - 1
+
+        upB = Button(accFrame, text="↑", font=('arial', 16, 'bold'), command=lambda ln=line: move_card(ln, "up"), bg=theme.BG_BUTTON, fg=FG_COLOR_P, relief="flat", bd=0, state="disabled" if move_up_disabled else "normal", activebackground=theme.BG_BUTTON)
+        upB.place(relx=0.92, y=8, width=32, height=28)
+        upB.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+
+        downB = Button(accFrame, text="↓", font=('arial', 16, 'bold'), command=lambda ln=line: move_card(ln, "down"), bg=theme.BG_BUTTON, fg=FG_COLOR_P, relief="flat", bd=0, state="disabled" if move_down_disabled else "normal", activebackground=theme.BG_BUTTON)
+        downB.place(relx=0.92, y=44, width=32, height=28)
+        downB.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+
+        yPos += 100
+
+    inner_frame.update_idletasks()
+    total_height = yPos + 10
+    inner_frame.config(height=total_height, width=canvas.winfo_width())
+    canvas.update_idletasks()
+    canvas.config(scrollregion=(0, 0, canvas.winfo_width(), total_height))
+
+def settings(inner_frame, contFrame, canvas, dataFrame, user):
+    for widget in inner_frame.winfo_children():
+        if widget != contFrame: widget.destroy()
+    for widget in dataFrame.winfo_children(): widget.destroy()
+    yPos = 10
+    
+    inner_frame.update_idletasks()
+    total_height = yPos + 80
+    inner_frame.config(height=total_height, width=canvas.winfo_width())
+    canvas.update_idletasks()
+    canvas.config(scrollregion=(0, 0, canvas.winfo_width(), total_height))
+
+def notes(inner_frame, contFrame, canvas, dataFrame, user):
+    for widget in inner_frame.winfo_children():
+        if widget != contFrame: widget.destroy()
+    for widget in dataFrame.winfo_children(): widget.destroy()
