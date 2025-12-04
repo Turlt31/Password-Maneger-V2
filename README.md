@@ -44,7 +44,7 @@ python main.py
 - Favicons cached in `icon/favicons/`.
 
 ## Security Notes
-- Entries are stored **unencrypted** in plain text. Do not use for sensitive production secrets without adding encryption (e.g., filling out `cryption.py`).
+- Entries are stored **unencrypted** in plain text.(For now until I implement `cryption.py`).
 - OTP and PIN improve access control but do not encrypt stored data. Consider disk encryption or adding crypto before real-world use.
 
 ## Customization Ideas
