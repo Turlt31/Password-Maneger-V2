@@ -55,3 +55,7 @@ python main.py
 - `apps.py` — screens for passwords, cards, settings.
 - `theme.py` — theme definitions.
 - `cryption.py` — Argon2id key derivation and AES‑GCM encryption/decryption helpers.
+
+
+Feel Free to reach out to me if you have any questions
+Discord: `.turtl3.`
