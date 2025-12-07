@@ -1,8 +1,11 @@
+from argon2.low_level import hash_secret_raw, Type
 from tkinter import *
 from tkinter import ttk
 from PIL import Image, ImageTk, ImageOps
 
+
 import secrets
+import base64
 import random
 import string
 import pyotp
@@ -93,6 +96,8 @@ def loginScreen():
             username = u.get()
             password = p.get()
 
+            passwordData = cryption.createMasterPassword(password)
+
             if username == placeholderU or username == "":
                 Label(rect, text="Please enter a username!", font=('arial', 20), bg=BG_COLOR_LIGHT, fg="red").place(x=80, y=340)
                 return   
@@ -105,7 +110,7 @@ def loginScreen():
             usernameAvailable = True
             for i in usernames:
                 i = i.split(',')
-                if i[0] == username:
+                if i[2] == username:
                     usernameAvailable = False
                     break
             
@@ -128,10 +133,12 @@ def loginScreen():
                         }
                     }
                 }
+                with open('files/logins.txt', 'a') as f:
+                    f.write(f"{passwordData["salt"]},{passwordData["login_hash"]},{username}\n")
                 os.mkdir(f"files/{username}")
                 os.mkdir(f"files/{username}/config")
 
-                with open('files/logins.txt', 'a') as f: f.write(f"{username},{password}\n")
+
                 [open(f"files/{username}/{file}", 'w').close() for file in ["cards.txt", "passwords.txt", "notes.txt"]]
                 with open(f"files/{username}/config/settings.json", "w") as f:
                     json.dump(data, f, indent=4)
@@ -163,7 +170,8 @@ def loginScreen():
                 totp = pyotp.TOTP(data["settings"]["Authentication"]["authKey"])
                 if totp.verify(code.get()): mainScreen(user.strip('\n')); otpS.destroy()
                 else: pass
-                
+            
+
             otpS = Toplevel(root)
             otpS.title("2 Factor Authentication")
             otpS.geometry("500x200")
@@ -176,7 +184,6 @@ def loginScreen():
             code.place(x=100, y=73, height=35, width=200)
             code.bind("<Return>", on_return)
             Button(otpS, text="Authenticate", font=('arial', 20), command=authenticate).place(x=310, y=73, height=35, width=180)
-
         user = u.get()
         pasw = p.get()
 
@@ -185,17 +192,19 @@ def loginScreen():
 
             for i in data:
                 i = i.split(",")
-                if user == i[0] and pasw == i[1].strip('\n'):
-                    with open(f'files/{user}/config/settings.json', 'r') as f:
-                        data = json.load(f)
-                    if not data["settings"]["Authentication"]["auth"]:
-                        mainScreen(user)
-                    else:
-                        print("Auth Needed")
-                        otp()
-                    break
-                elif user == i[0] and pasw != i[1]: errL.config(text="[-] Incorrect Password", fg="red"); break
-                elif user != i[0]: errL.config(text="[-] Account Does Not Exist", fg="red")
+                if user == i[2].strip('\n'):
+                    loginBool, vaultKey = cryption.verifyMasterPassword(pasw, i[0], i[1])
+                    if loginBool:
+                        with open(f'files/{user}/config/settings.json', 'r') as f:
+                            data = json.load(f)
+                        if not data["settings"]["Authentication"]["auth"]:
+                            mainScreen(user, vaultKey)
+                        else:
+                            print("Auth Needed")
+                            otp()
+                        break
+                    elif user == i[2].strip('\n') and not loginBool: errL.config(text="[-] Incorrect Password", fg="red"); break
+                    else: errL.config(text="[-] Account Does Not Exist", fg="red")
 
     rect = Canvas(root, width=500, height=500, bg=BG_COLOR_LIGHT, highlightthickness=0)
     rect.place(relx=0.5, rely=0.5, anchor=CENTER)
@@ -233,7 +242,7 @@ def loginScreen():
     regB.bind("<Enter>", onHoverEnter)
     regB.bind("<Leave>", onHoverLeave)
 
-def mainScreen(user):
+def mainScreen(user, vaultKey):
     for widget in root.winfo_children(): widget.destroy()
     placeholder = "Search..."
     
@@ -257,10 +266,13 @@ def mainScreen(user):
     ACCENT_BLUE_GLOW = currentTheme["ACCENT_BLUE_GLOW"]
     
     def load(user):
-        with open(f"files/{user}/passwords.txt", 'r') as f:
-            pa = f.readlines()
-        with open(f"files/{user}/cards.txt", 'r') as f:
-            ca = f.readlines()
+        pa, ca = [], []
+        with open(f"files/{user}/passwords.txt", 'r') as f: data = f.readlines()
+        for i in data: pa.append(cryption.decrypt_line(vaultKey, i))
+        
+        with open(f"files/{user}/cards.txt", 'r') as f: data = f.readlines()
+        for i in data: ca.append(cryption.decrypt_line(vaultKey, i))
+
 
         return pa, ca
 
@@ -277,7 +289,7 @@ def mainScreen(user):
             cardsB.config(fg=FG_COLOR_P, image=cardsIconWPTK)
             menuOpen = "pasw"
             passwordList, cardList = load(user)
-            apps.passwords(passwordList, inner_frame, contFrame, canvas, dataFrame, root, user, searchE.get())
+            apps.passwords(passwordList, inner_frame, contFrame, canvas, dataFrame, root, user, searchE.get(), vaultKey)
         if widget == cardsB:
             addB.config(state="normal")
             searchE.config(state="normal")
@@ -285,7 +297,7 @@ def mainScreen(user):
             loginsB.config(fg=FG_COLOR_P, image=loginsIconWPTK)
             menuOpen = "card"
             passwordList, cardList = load(user)
-            apps.cards(cardList, inner_frame, contFrame, canvas, dataFrame, root, user, searchE.get())
+            apps.cards(cardList, inner_frame, contFrame, canvas, dataFrame, root, user, searchE.get(), vaultKey)
         if widget == logoutB: loginScreen()
         if widget == settingsB:
             addB.config(state="disabled")
@@ -329,9 +341,9 @@ def mainScreen(user):
     def search(event):
         global menuOpen
         if menuOpen == "pasw":
-            apps.passwords(passwordList, inner_frame, contFrame, canvas, dataFrame, user, searchE.get())
+            apps.passwords(passwordList, inner_frame, contFrame, canvas, dataFrame, user, searchE.get(), vaultKey)
         if menuOpen == "card":
-            apps.cards(cardList, inner_frame, contFrame, canvas, dataFrame, user, searchE.get())
+            apps.cards(cardList, inner_frame, contFrame, canvas, dataFrame, user, searchE.get(), vaultKey)
     def add():
         def centerWindow(root, win, w, h):
             root.update_idletasks()
@@ -434,19 +446,21 @@ def mainScreen(user):
                 pE.insert(0, "".join(password))
                 pE.config(fg=FG_COLOR_P, justify="left")
             def savePassword():
+                passwordList = []
                 website = wnE.get()
                 websiteLink = f"www.{website.lower()}{selected.get()}"
                 username = uE.get()
                 password = pE.get()
                 auth = authE.get()
 
-                if auth == phAuth: account = f"{website},{websiteLink},{username},{password}\n"
-                else: account = f"{website},{websiteLink},{username},{password},{auth}\n"
+                if auth == phAuth: account = cryption.encrypt_line(vaultKey, f"{website},{websiteLink},{username},{password}")
+                else: account = cryption.encrypt_line(vaultKey, f"{website},{websiteLink},{username},{password},{auth}")
 
-                with open(f"files/{user}/passwords.txt", 'a') as f: f.write(account)
-                with open(f"files/{user}/passwords.txt", 'r') as f: passwordList = f.readlines()
+                with open(f"files/{user}/passwords.txt", 'a') as f: f.write(account+'\n')
+                with open(f"files/{user}/passwords.txt", 'r') as f: data = f.readlines()
+                for i in data: passwordList.append(cryption.decrypt_line(vaultKey, i))
                 addScreen.destroy()
-                apps.passwords(passwordList, inner_frame, contFrame, canvas, dataFrame, root, user, searchE.get())
+                apps.passwords(passwordList, inner_frame, contFrame, canvas, dataFrame, root, user, searchE.get(), vaultKey)
 
             Label(addScreen, text="Add Password", font=('arial', 32), bg=BG_PANEL, fg=FG_COLOR_P).place(x=60, y=5)
 
@@ -494,6 +508,7 @@ def mainScreen(user):
         if menuOpen == "card":
             addScreen.title("Add Card")
 
+            cardList = []
             phB = "Bank Name"
             phN = "Name on Card"
             phC = "Card Number"
@@ -575,12 +590,13 @@ def mainScreen(user):
                     expdE.delete(0, END)
                     expdE.insert(0, formatted)
             def saveCard():
-                cardDetails = f"{bE.get()},www.{bE.get().lower()}{selected.get()},{nE.get()},{cE.get()},{expdE.get()},{cvcE.get()},{pinE.get()}\n"
+                cardDetails = cryption.encrypt_line(vaultKey, f"{bE.get()},www.{bE.get().lower()}{selected.get()},{nE.get()},{cE.get()},{expdE.get()},{cvcE.get()},{pinE.get()}")
 
-                with open(f"files/{user}/cards.txt", 'a') as f: f.write(cardDetails)
-                with open(f"files/{user}/cards.txt", 'r') as f: passwordList = f.readlines()
+                with open(f"files/{user}/cards.txt", 'a') as f: f.write(cardDetails+'\n')
+                with open(f"files/{user}/cards.txt", 'r') as f: data = f.readlines()
+                for i in data: cardList.append(cryption.decrypt_line(vaultKey, i))
                 addScreen.destroy()
-                apps.cards(passwordList, inner_frame, contFrame, canvas, dataFrame, root, user, searchE.get())
+                apps.cards(cardList, inner_frame, contFrame, canvas, dataFrame, root, user, searchE.get(), vaultKey)
 
             Label(addScreen, text="Add Card", font=('arial', 32), bg=BG_PANEL, fg=FG_COLOR_P).place(x=100, y=5)
 
@@ -774,10 +790,10 @@ def mainScreen(user):
     logoutB.bind("<Leave>", onHoverLeave)
 
     if menuOpen == "pasw":
-        apps.passwords(passwordList, inner_frame, contFrame, canvas, dataFrame, root, user, searchE.get())
+        apps.passwords(passwordList, inner_frame, contFrame, canvas, dataFrame, root, user, searchE.get(), vaultKey)
         loginsB.config(fg=ACCENT_BLUE, image=loginsIconBPTK)
     elif menuOpen == "card":
-        apps.cards(cardList, inner_frame, contFrame, canvas, dataFrame, root, user, searchE.get())
+        apps.cards(cardList, inner_frame, contFrame, canvas, dataFrame, root, user, searchE.get(), vaultKey)
         cardsB.config(fg=ACCENT_BLUE, image=cardsIconBPTK)
     elif menuOpen == "sett":
         cardsB.config(fg=FG_COLOR_P, image=cardsIconWPTK)
