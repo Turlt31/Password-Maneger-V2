@@ -32,9 +32,9 @@ python main.py
 
 ## Usage
 1. Launch and **Register** a user (creates `files/<user>/` with encrypted vault files and `config/settings.json`).
-2. **Login**; if OTP is enabled, enter the 6-digit code. If PIN is required, you will be prompted.
+2. **Login**; if OTP is enabled, enter the 6-digit code. If a PIN is required, you will be prompted.
 3. Use the left menu to switch between **Logins**, **Cards**, and **Settings**.
-4. Click **+** to add entries. Passwords can be generated and toggled hidden/visible.
+4. Click **+** to add entries. Passwords can be generated and toggled between hidden/visible.
 5. Click fields in the detail view to copy (username/password/TOTP/card fields). Use the eye/edit/bin icons to show, edit, or delete.
 6. In **Settings**, adjust theme, default screen, favicon loading, password visibility, PIN requirement, and OTP toggle.
 
@@ -48,13 +48,17 @@ python main.py
 - Keep your master password safe; it derives the vault key.
 - Back up `files/<user>/` if you care about the data; losing it loses the vault.
 - If you have old plaintext data, re-add it through the app so it is written in encrypted form.
-- OTP/PIN protect access but do not replace the need for a strong master password and secure backups.
+- OTP/PIN protects access, but does not replace the need for a strong master password and secure backups.
 
 ## Project Layout
 - `main.py` — UI shell (login/register, navigation).
-- `apps.py` — screens for passwords, cards, settings.
+- `apps.py` — screens for passwords, cards, and settings.
 - `theme.py` — theme definitions.
 - `cryption.py` — Argon2id key derivation and AES‑GCM encryption/decryption helpers.
+
+## Screen Shots
+<img width="1575" height="827" alt="image" src="https://github.com/user-attachments/assets/41a6a43d-adec-4e7e-ae35-de5d79fec15c" />
+
 
 <br>
 
