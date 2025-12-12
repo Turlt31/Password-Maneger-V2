@@ -1108,8 +1108,8 @@ def cards(cardList, inner_frame, contFrame, canvas, dataFrame, root, user, searc
         bankNameL.place(x=80, y=2)
         bankNameL.bind("<Button-1>", lambda e, p=parts, ln=line: displayCard(p, ln, e))
         bankNameL.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
-        cardNameL = Label(accFrame, text=parts[2], font=('arial', 15), bg=BG_CARD, fg=FG_COLOR_S)
-        cardNameL.place(x=80, y=47)
+        cardNameL = Label(accFrame, text=parts[2], font=('arial', 14), bg=BG_CARD, fg=FG_COLOR_S)
+        cardNameL.place(x=80, y=46)
         cardNameL.bind("<Button-1>", lambda e, p=parts, ln=line: displayCard(p, ln, e))
         cardNameL.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
 
@@ -1686,13 +1686,13 @@ def notes(inner_frame, contFrame, canvas, dataFrame, user, root, vaultKey):
         accFrame.bind("<Button-1>", lambda e, n=note[0], d=note[1]: displayNote(n, d, e))
         accFrame.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
 
-        noteNameL = Label(accFrame, text=note[0], font=('arial', 30), bg=BG_CARD, fg=FG_COLOR_P)
+        noteNameL = Label(accFrame, text=note[0], font=('arial', 28), bg=BG_CARD, fg=FG_COLOR_P)
         noteNameL.place(x=5, y=2)
         noteNameL.bind("<Button-1>", lambda e, n=note[0], d=note[1]: displayNote(n, d, e))
         noteNameL.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
 
         noteDescL = Label(accFrame, text=note[1], font=('arial', 14), bg=BG_CARD, fg=FG_COLOR_S)
-        noteDescL.place(x=5, y=50)
+        noteDescL.place(x=5, y=46)
         noteDescL.bind("<Button-1>", lambda e, n=note[0], d=note[1]: displayNote(n, d, e))
         noteDescL.bind("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
 

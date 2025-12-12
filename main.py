@@ -140,7 +140,7 @@ def loginScreen():
                 os.mkdir(f"files/{username}/notes")
 
 
-                [open(f"files/{username}/{file}", 'w').close() for file in ["cards.txt", "passwords.txt", "notes.txt"]]
+                [open(f"files/{username}/{file}", 'w').close() for file in ["cards.txt", "passwords.txt"]]
                 with open(f"files/{username}/config/settings.json", "w") as f:
                     json.dump(data, f, indent=4)
 
@@ -759,10 +759,10 @@ def mainScreen(user, vaultKey):
                 notesDesc = notesDescE.get()
                 if notesName != notesNamePH:
                     if notesDesc != notesDescPH:
-                        with open(f"files/{user}/notes/{notesName}.txt", 'w') as f: f.write("")
+                        with open(f"files/{user}/notes/{notesName}-{notesDesc}.txt", 'w') as f: f.write("")
 
+                addScreen.destroy()
                 apps.notes(inner_frame, contFrame, canvas, dataFrame, user, root, vaultKey)
-
 
             notesNameE = Entry(addScreen, font=('arial', 28), fg=FG_COLOR_S, bg=BG_INPUT, relief="flat", borderwidth=0, justify="center")
             notesNameE.place(x=10, y=70, height=50, width=380)
